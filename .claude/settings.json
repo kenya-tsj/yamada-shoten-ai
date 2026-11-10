@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 tools/q.py *)",
+      "Bash(python3 tools/sim.py status)",
+      "Bash(python3 tools/dashboard.py)",
+      "Bash(python3 tools/dashboard.py *)",
+      "Bash(python3 tools/approvals.py list)",
+      "Bash(python3 tools/approvals.py list *)",
+      "Bash(python3 tools/approvals.py check)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Edit(/reports/**)",
+      "Edit(/approvals/pending/**)",
+      "Edit(/logs/**)"
+    ],
+    "deny": [
+      "Edit(/data/**)",
+      "Edit(/company/**)",
+      "Edit(/knowledge/**)",
+      "Edit(/sim/**)",
+      "Edit(/tools/**)",
+      "Edit(/approvals/approved/**)",
+      "Edit(/approvals/rejected/**)",
+      "Edit(/logs/意思決定ログ.md)",
+      "Read(/tools/仕込み一覧.md)",
+      "Bash(rm *)",
+      "Bash(git push *)"
+    ]
+  }
+}

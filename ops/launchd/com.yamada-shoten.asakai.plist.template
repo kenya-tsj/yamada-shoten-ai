@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  毎朝7時（月〜土）に、やまだ商店（架空）の /朝会 を Claude Code で自動で回すためのひな形。
+  まだ入れていない（テンプレート）。入れ方は README の「毎朝7時に自動で朝会」。
+  REPO_PATH は sed で置きかえる（例：/Users/あなた/Yamada -shoten/yamada-shoten-ai）。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.yamada-shoten.asakai</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "REPO_PATH" &amp;&amp; claude -p "/朝会" &gt;&gt; "REPO_PATH/logs/朝会_自動.log" 2&gt;&amp;1</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>6</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>/tmp/yamada-shoten-asakai.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/yamada-shoten-asakai.err</string>
+</dict>
+</plist>

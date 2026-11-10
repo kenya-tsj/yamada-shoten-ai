@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>やまだ商店 経営ダッシュボード（架空）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!--
+  やまだ商店（架空）の経営ダッシュボード。tools/dashboard.py が reports/dashboard_data.json を作り、
+  下の DASH_DATA の印を window.DASH に置き換えて reports/dashboard.html を書く（このファイルは雛形・直接開くと見本の数字）。
+  画面は3つ：1 ダッシュボード／2 データの流れ（数字ごとに、どのサービス→どのデータ→どの数字か）／3 データマップ（使っているサービスの一覧）。
+  操作：1・2・3＝画面を切り替え／→ ←＝データの流れで次・前の数字／クリック＝その数字の出どころを見る／D＝黒と白。
+  サービスとのつながりは全部シミュレーション（本当にはつないでいない）。1920x1080 の固定の舞台。動画で重なる右下（顔の小窓）と右上（番組タイトル）は空けてある。
+-->
+<style>
+  :root{--bg:#F6F5F1;--card:#FFFFFF;--ink:#111214;--sub:#6E6E73;--line:#E3E1DB;--acc:#E3A21A;--acc-ink:#8A5A00;--acc-soft:#FBF0D6;--shadow:0 8px 24px rgba(17,18,20,.07)}
+  html.dark{--bg:#0E0F12;--card:#17181C;--ink:#F3F1EA;--sub:#9A9AA2;--line:rgba(255,255,255,.10);--acc:#E9B23C;--acc-ink:#F2C561;--acc-soft:rgba(233,178,60,.14);--shadow:0 8px 24px rgba(0,0,0,.35)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);overflow:hidden}
+  body{font-family:"Noto Sans JP",-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;color:var(--ink);font-feature-settings:"palt" 1;-webkit-font-smoothing:antialiased}
+  .stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"palt" 1}
+
+  /* 頭 */
+  .top{position:absolute;left:96px;top:44px;right:700px;display:flex;align-items:center;gap:22px}
+  .logo{width:56px;height:56px;border-radius:16px;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:900;font-size:26px}
+  .ttl{font-size:34px;font-weight:900;letter-spacing:.01em;white-space:nowrap}
+  .ttl small{display:block;font-size:18px;font-weight:500;color:var(--sub);margin-top:2px;letter-spacing:.04em}
+  .fake{padding:5px 12px;border-radius:999px;border:1.5px solid var(--line);font-size:15px;font-weight:700;color:var(--sub);white-space:nowrap}
+  .tabs{position:absolute;left:96px;top:128px;display:flex;gap:6px;padding:6px;border-radius:16px;background:var(--card);border:1.5px solid var(--line)}
+  .tab{padding:10px 22px;border-radius:11px;font-size:20px;font-weight:700;color:var(--sub);cursor:pointer;white-space:nowrap}
+  .tab b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--line);color:var(--sub);font-size:14px;margin-right:8px}
+  .tab.on{background:var(--ink);color:var(--bg)} .tab.on b{background:var(--acc);color:#111}
+
+  .view{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .4s}
+  .view.on{opacity:1;visibility:visible}
+  .card{position:absolute;background:var(--card);border:1.5px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:22px 26px}
+  .card h3{font-size:20px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:10px;letter-spacing:.02em}
+  .card h3 .src{margin-left:auto;font-size:14px;font-weight:700;color:var(--acc-ink);background:var(--acc-soft);padding:4px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+  .rise{animation:rise .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:var(--d,0s)}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+  /* 1 KPI のタイル */
+  .kpis{position:absolute;left:96px;top:212px;width:1450px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .kpis .kpi.mini{padding:12px 20px;display:flex;align-items:center;gap:14px}
+  .kpis .kpi.mini .l{font-size:17px;flex:none}
+  .kpis .kpi.mini .v{font-size:30px;margin:0}
+  .kpis .kpi.mini .v small{font-size:16px}
+  .kpis .kpi.mini{height:74px}
+  .kpis .kpi.mini .d{margin:0 0 0 auto;font-size:0;white-space:nowrap}
+  .kpis .kpi.mini .d i{font-size:14px}
+  .kpis .kpi.mini .s{display:none}
+  .kpi{position:relative;background:var(--card);border:1.5px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:14px 22px 12px;cursor:pointer;transition:transform .2s,border-color .2s}
+  .kpi:hover{transform:translateY(-3px);border-color:var(--acc)}
+  .kpi .l{font-size:18px;font-weight:700;color:var(--sub)}
+  .kpi .v{font-size:42px;font-weight:900;letter-spacing:-.01em;line-height:1.1;margin-top:4px;white-space:nowrap}
+  .kpi .v small{font-size:20px;font-weight:700;margin-left:4px;color:var(--sub)}
+  .kpi .d{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:16px;font-weight:700;color:var(--sub)}
+  .kpi .d i{font-style:normal;padding:2px 9px;border-radius:999px;background:var(--line);color:var(--ink)}
+  .kpi .d i.up{background:var(--acc-soft);color:var(--acc-ink)}
+  .kpi .s{position:absolute;right:16px;top:16px;font-size:13px;font-weight:700;color:var(--sub);display:flex;gap:4px;align-items:center}
+  .kpi .s span{width:9px;height:9px;border-radius:50%;background:var(--acc)}
+  .kpi.alert{border-color:var(--ink)}
+  .kpi.alert .v{color:var(--ink)}
+
+  /* 1 グラフ */
+  .chartbox{left:96px;top:470px;width:900px;height:390px}
+  .chartbox svg{position:absolute;left:56px;top:92px;width:818px;height:270px;overflow:visible}
+  .ln{fill:none;stroke-width:4;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:3000;stroke-dashoffset:3000;animation:draw 2s .3s ease forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .ax{font-size:15px;fill:var(--sub)}
+  .legend{position:absolute;left:26px;top:58px;display:flex;gap:18px;font-size:15px;font-weight:700;color:var(--sub)}
+  .legend i{display:inline-block;width:22px;height:5px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .biz{left:1020px;top:470px;width:526px;height:390px}
+  .bz{display:grid;grid-template-columns:64px 1fr 150px;align-items:center;gap:12px;margin-top:16px}
+  .bz .n{font-size:20px;font-weight:700}
+  .bz .bar{position:relative;height:26px;border-radius:8px;background:var(--bg);overflow:hidden}
+  .bz .bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:8px;background:var(--ink);transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+  .bz .bar i.hot{background:var(--acc)}
+  .bz .bar u{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--acc-ink);text-decoration:none}
+  .bz .p{font-size:18px;font-weight:700;text-align:right;white-space:nowrap}
+  .bz .p small{display:block;font-size:12.5px;color:var(--sub);font-weight:500;white-space:nowrap}
+
+  /* 1 下の段 */
+  .chan{left:96px;top:878px;width:900px;height:84px;padding:12px 26px;display:flex;align-items:center;gap:22px}
+  .chan h3{width:200px;flex:none;white-space:nowrap}
+  .stack{flex:1;height:34px;border-radius:10px;overflow:hidden;display:flex;background:var(--bg)}
+  .stack i{display:block;height:100%;width:0;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+  .chanlg{display:flex;gap:16px;font-size:15px;font-weight:700;color:var(--sub);flex:none}
+  .chanlg span i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+  .alerts{left:1020px;top:878px;width:526px;height:84px;padding:10px 22px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+  .al{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .al .tag{flex:none;padding:3px 10px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:14px}
+  .al .tag.acc{background:var(--acc);color:#111}
+
+  /* 1 承認待ち（右の列・顔の小窓より上） */
+  .appr{left:1566px;top:212px;width:300px;height:470px;padding:20px}
+  .ap{padding:12px 0;border-top:1px solid var(--line)}
+  .ap:first-of-type{border-top:0}
+  .ap .w{font-size:17px;font-weight:700;line-height:1.35}
+  .ap .m{display:flex;gap:8px;margin-top:6px;font-size:14px;color:var(--sub);font-weight:700}
+  .ap .m .due{color:var(--acc-ink)}
+  .ap.urgent .w::before{content:"今日まで";display:inline-block;margin-right:8px;padding:1px 8px;border-radius:6px;background:var(--acc);color:#111;font-size:13px}
+
+  /* 2 データの流れ */
+  .flow{position:absolute;left:96px;top:212px;width:1450px;height:820px}
+  .kpibar{position:absolute;left:96px;top:212px;display:flex;gap:10px;flex-wrap:wrap;width:1450px}
+  .kchip{padding:10px 18px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font-size:18px;font-weight:700;color:var(--sub);cursor:pointer;white-space:nowrap}
+  .kchip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .cols{position:absolute;left:96px;top:300px;width:1450px;height:700px}
+  .colh{position:absolute;top:0;font-size:18px;font-weight:700;color:var(--sub);letter-spacing:.06em}
+  .node{position:absolute;padding:14px 18px;border-radius:18px;background:var(--card);border:1.5px solid var(--line);box-shadow:var(--shadow);font-size:20px;font-weight:700;white-space:nowrap;opacity:0;transform:translateX(-14px);transition:opacity .45s,transform .45s}
+  .node.show{opacity:1;transform:none}
+  .node small{display:block;font-size:14px;color:var(--sub);font-weight:500;margin-top:2px}
+  .node .how{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:6px;background:var(--acc-soft);color:var(--acc-ink);font-size:13px;vertical-align:2px}
+  .node.file{font-family:ui-monospace,Menlo,monospace;font-size:17px}
+  .node.kpi2{background:var(--ink);color:var(--bg);border-color:var(--ink);font-size:24px;padding:22px 26px}
+  .node.kpi2 .bigv{display:block;font-size:46px;font-weight:900;margin-top:6px;font-family:"Noto Sans JP",sans-serif}
+  .node.kpi2 small{color:rgba(255,255,255,.7)}
+  html.dark .node.kpi2 small{color:rgba(0,0,0,.6)}
+  svg.wires{position:absolute;left:0;top:0;width:1450px;height:700px;overflow:visible;pointer-events:none}
+  .wire{fill:none;stroke:var(--line);stroke-width:3}
+  .wire.hot{stroke:var(--acc);stroke-width:3.5;stroke-dasharray:1200;stroke-dashoffset:1200;animation:draw 1.1s ease forwards}
+  .dot{fill:var(--acc)}
+  .howbox{position:absolute;left:96px;top:1000px;font-size:20px;font-weight:700;color:var(--sub)}
+  .howbox b{color:var(--ink)}
+
+  /* 3 データマップ */
+  .map{position:absolute;left:96px;top:212px;width:1450px;column-count:3;column-gap:18px}
+  .grp{display:inline-block;width:100%;break-inside:avoid;margin-bottom:16px;background:var(--card);border:1.5px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:14px 20px 10px}
+  .grp h4{font-size:18px;font-weight:900;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+  .grp h4 i{width:12px;height:12px;border-radius:4px;background:var(--acc)}
+  .svc{display:grid;grid-template-columns:1fr auto;gap:1px 10px;padding:7px 0;border-top:1px solid var(--line)}
+  .svc:first-of-type{border-top:0}
+  .svc .nm{font-size:17px;font-weight:700;white-space:nowrap}
+  .svc .bd{display:flex;gap:6px;justify-content:flex-end}
+  .svc .bd span{padding:2px 8px;border-radius:6px;font-size:13px;font-weight:700;background:var(--bg);color:var(--sub);white-space:nowrap}
+  .svc .bd span.api{background:var(--acc-soft);color:var(--acc-ink)}
+  .svc .wt{grid-column:1/-1;font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .svc .ag{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+  .svc .ag span{font-size:13px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
+  .mapnote{position:absolute;left:740px;top:150px;width:800px;font-size:15px;color:var(--sub);line-height:1.5}
+</style>
+</head>
+<body>
+<!--DASH_DATA-->
+<div class="stage" id="stage">
+  <div class="top">
+    <div class="logo">や</div>
+    <div class="ttl">やまだ商店 経営ダッシュボード<small id="asof"></small></div>
+    <span class="fake">架空の会社・データはシミュレーション</span>
+  </div>
+  <div class="tabs" id="tabs">
+    <div class="tab on" data-v="0"><b>1</b>ダッシュボード</div>
+    <div class="tab" data-v="1"><b>2</b>データの流れ</div>
+    <div class="tab" data-v="2"><b>3</b>データマップ</div>
+  </div>
+
+  <!-- 1 ダッシュボード -->
+  <section class="view on" id="v0">
+    <div class="kpis" id="kpis"></div>
+    <div class="card chartbox rise" style="--d:.15s"><h3>売上と予算・酒類（日別・8週間）<span class="src" data-k="sales_yesterday">出どころ</span></h3>
+      <div class="legend"><span><i style="background:var(--ink)"></i>売上（全社）</span><span><i style="background:var(--sub);opacity:.5"></i>予算</span><span><i style="background:var(--acc)"></i>酒類（下の段）</span><span>日曜は定休日なので抜いている</span></div>
+      <svg id="chart" viewBox="0 0 848 330"></svg></div>
+    <div class="card biz rise" style="--d:.25s"><h3>事業別（直近7日の売上・今月の予算比）</h3><div id="bizlist"></div></div>
+    <div class="card chan rise" style="--d:.35s"><h3>ネット3店（今月）</h3><div class="stack" id="stack"></div><div class="chanlg" id="chanlg"></div></div>
+    <div class="card alerts rise" style="--d:.45s" id="alerts"></div>
+    <div class="card appr rise" style="--d:.3s"><h3>承認待ち<span class="src" data-k="approvals">出どころ</span></h3><div id="apprlist"></div></div>
+  </section>
+
+  <!-- 2 データの流れ -->
+  <section class="view" id="v1">
+    <div class="kpibar" id="kpibar"></div>
+    <div class="cols" id="cols">
+      <div class="colh" style="left:0">① どのサービスから</div>
+      <div class="colh" style="left:520px">② どのデータに</div>
+      <div class="colh" style="left:1020px">③ どの数字に</div>
+      <svg class="wires" id="wires"></svg>
+    </div>
+    <div class="howbox" id="howbox"></div>
+  </section>
+
+  <!-- 3 データマップ -->
+  <section class="view" id="v2">
+    <div class="map" id="map"></div>
+    <div class="mapnote">取り込み方：<b>API</b>＝自動でつながる ／ CSV＝書き出したファイル ／ 手入力 ／ PDF読み取り。全部シミュレーション（本当にはつないでいない）。</div>
+  </section>
+</div>
+
+<script>
+/* 見本の数字（dashboard.py が本物の window.DASH を入れたら、そちらを使う） */
+const SAMPLE = (()=>{const days=56,s=[],b=[],l=[];const t0=new Date('2026-09-15');
+  for(let i=0;i<days;i++){const d=new Date(t0);d.setDate(d.getDate()+i);const iso=d.toISOString().slice(0,10);const sun=d.getDay()===0;
+    const base=sun?0:160000+((i*37)%9)*4000+(d.getDay()===6?30000:0);s.push({d:iso,v:base});b.push({d:iso,v:sun?0:165000});
+    l.push({d:iso,v:sun?0:(i>=days-5?17000:26000)+((i*13)%7)*900});}
+  return {company:'株式会社やまだ商店（架空）',today:'2026-11-10',as_of:'昨日まで',
+  kpis:[
+   {id:'sales_yesterday',label:'昨日の売上',value:182212,unit:'円',delta:{vs:'前週同曜日',pct:3.1},how:'店・配達・ネット3店・ギフト・法人の合計',files:['data/store/POS_日別.csv','data/ec/注文_日別.csv','data/delivery/配達_日別.csv','data/b2b/納品_日別.csv','data/gift/ギフト受注_日別.csv'],sources:['smaregi','shopify','rakuten','amazon','delivery_sheet','freee_invoice']},
+   {id:'month_budget',label:'今月の売上（予算比）',value:101.3,unit:'%',delta:{vs:'今月の売上',pct:null,text:'1,325,744円'},how:'今月の売上 ÷ 今日までの予算',files:['data/accounting/日計表.csv','data/accounting/予算.csv'],sources:['freee','budget_xlsx']},
+   {id:'gross_margin',label:'粗利率（直近7日）',value:29.6,unit:'%',delta:{vs:'前週',pct:-0.2},how:'（売上 − 仕入れ原価）÷ 売上',files:['data/accounting/日計表.csv','data/master/商品.csv'],sources:['freee','smaregi']},
+   {id:'cash',label:'現金',value:3882314,unit:'円',delta:{vs:'月末の見込み',pct:null,text:'2,525,124円'},how:'銀行の残高＋レジの現金',files:['data/accounting/資金繰り.csv'],sources:['bank','freee']},
+   {id:'customers',label:'客数（昨日・店）',value:118,unit:'人',delta:{vs:'前週同曜日',pct:0.0},how:'レジを通った回数',files:['data/store/POS_日別.csv'],sources:['smaregi']},
+   {id:'ticket',label:'客単価（昨日・店）',value:878,unit:'円',delta:{vs:'前週同曜日',pct:-10.7},how:'店の売上 ÷ 客数',files:['data/store/POS_日別.csv'],sources:['smaregi']},
+   {id:'stockouts',label:'欠品',value:1,unit:'品',alert:true,delta:{vs:'',pct:null,text:'播磨ゴールド'},how:'在庫が0の品目（発注残なし）',files:['data/purchasing/在庫.csv'],sources:['smaregi']},
+   {id:'approvals',label:'承認待ち',value:5,unit:'件',alert:true,delta:{vs:'',pct:null,text:'うち今日まで1件'},how:'AI の提案で、社長の決定を待つもの',files:['approvals/pending/'],sources:['ai_proposals']}],
+  by_business:[{name:'店舗',value:688082,wow_pct:-5.5,budget_pct:92.4},{name:'配達',value:151400,wow_pct:18.2,budget_pct:109.4},{name:'EC',value:87120,wow_pct:40.0,budget_pct:84.6},{name:'ギフト',value:101400,wow_pct:27.4,budget_pct:604.1},{name:'法人',value:116340,wow_pct:3.7,budget_pct:90.2}],
+  by_channel:[{name:'自社サイト',value:38400,orders:9,source:'shopify'},{name:'楽天市場',value:31200,orders:8,source:'rakuten'},{name:'Amazon',value:17520,orders:6,source:'amazon'}],
+  series:{'売上_日別':s,'予算_日別':b,'酒類_日別':l},
+  alerts:{stockouts:[{商品:'播磨ゴールド（350ml×6缶パック）',since:'2026-11-05',lost:44240}],overdue:[{相手:'居酒屋 千鳥足',金額:272340,日数:41}],
+    approvals:[{id:'20261110-251',何を:'播磨ゴールド 95パックの発注',金額:109250,期限:'今日15:00',部:'仕入れ',urgent:true},{id:'20261110-401',何を:'サイトの在庫連動と未出荷6件へのお知らせ',金額:0,期限:'11/11 12:00',部:'EC'},{id:'20261110-402',何を:'地ビールセットの20歳未満の表示',金額:0,期限:'11/11 12:00',部:'EC'},{id:'20261110-252',何を:'ティッシュ 52箱の発注',金額:14560,期限:'11/12',部:'仕入れ'},{id:'20261110-551',何を:'千鳥足への書面の督促',金額:272340,期限:'11/13 17:00',部:'経理'}]},
+  sources:[
+   {id:'smaregi',name:'スマレジ',category:'店舗',what:'レジの売上・客数・品目・在庫',how:'API',freq:'毎晩',files:['data/store/POS_日別.csv','data/purchasing/在庫.csv'],agents:['AI店長','AI仕入れ']},
+   {id:'delivery_sheet',name:'配達・電話注文台帳',category:'社内',what:'電話注文・配達の件数と地区',how:'Google スプレッドシート',freq:'毎晩',files:['data/delivery/配達_日別.csv'],agents:['AI受付','AI物流']},
+   {id:'shopify',name:'自社サイト（Shopify）',category:'ネット販売',what:'注文・売上・在庫表示',how:'API',freq:'毎晩',files:['data/ec/注文_日別.csv'],agents:['AI EC販売']},
+   {id:'rakuten',name:'楽天市場',category:'ネット販売',what:'注文・売上・手数料',how:'CSV',freq:'毎朝',files:['data/ec/注文_日別.csv'],agents:['AI EC販売']},
+   {id:'amazon',name:'Amazon',category:'ネット販売',what:'注文・売上・手数料',how:'API',freq:'毎朝',files:['data/ec/注文_日別.csv'],agents:['AI EC販売']},
+   {id:'ga4',name:'Google アナリティクス 4',category:'集客・広告',what:'サイトの訪問・購入率',how:'API',freq:'毎朝',files:['data/ec/商品ページ.csv'],agents:['AI EC販売','AI広告']},
+   {id:'google_ads',name:'Google 広告',category:'集客・広告',what:'広告費・クリック・売上',how:'API',freq:'毎朝',files:['data/marketing/広告.csv'],agents:['AI広告']},
+   {id:'meta_ads',name:'Meta 広告（Instagram）',category:'集客・広告',what:'広告費・反応',how:'API',freq:'毎朝',files:['data/marketing/広告.csv'],agents:['AI広告']},
+   {id:'flyer',name:'新聞折込チラシ',category:'集客・広告',what:'印刷と折込の費用',how:'手入力',freq:'月次',files:['data/marketing/広告.csv'],agents:['AI広告']},
+   {id:'freee',name:'freee 会計',category:'会計・お金',what:'仕訳・月次PL・売掛・買掛',how:'API',freq:'毎晩',files:['data/accounting/日計表.csv','data/accounting/月次PL.csv','data/accounting/売掛金.csv'],agents:['AI経理']},
+   {id:'freee_invoice',name:'freee 請求書',category:'会計・お金',what:'法人への請求・入金',how:'API',freq:'毎晩',files:['data/b2b/納品_日別.csv'],agents:['AI経理','AI営業']},
+   {id:'mf_expense',name:'マネーフォワード クラウド経費',category:'会計・お金',what:'経費の精算',how:'CSV',freq:'毎週',files:['data/accounting/日計表.csv'],agents:['AI経理']},
+   {id:'bank',name:'ネットバンキング',category:'会計・お金',what:'入出金・残高',how:'API',freq:'毎朝',files:['data/accounting/資金繰り.csv'],agents:['AI経理']},
+   {id:'gbp',name:'Google ビジネスプロフィール',category:'お客様の声',what:'口コミ・星',how:'API',freq:'毎朝',files:['data/marketing/口コミ.csv'],agents:['AI接客']},
+   {id:'instagram',name:'Instagram',category:'お客様の声',what:'投稿の反応・フォロワー',how:'API',freq:'毎朝',files:['data/marketing/SNS.csv'],agents:['AI広報']},
+   {id:'line',name:'LINE 公式アカウント',category:'お客様の声',what:'友だち数・配信の反応',how:'API',freq:'毎朝',files:['data/marketing/SNS.csv'],agents:['AI広報']},
+   {id:'contracts_pdf',name:'契約書・許認可（PDF）',category:'社内',what:'更新日・条件',how:'PDF読み取り',freq:'月次',files:['data/legal/契約.csv','data/legal/許認可.csv'],agents:['AI法務']},
+   {id:'kessansho_pdf',name:'前期の決算書（PDF）',category:'社内',what:'前年の数字',how:'PDF読み取り',freq:'年1回',files:['data/accounting/月次PL.csv'],agents:['AI経理']},
+   {id:'budget_xlsx',name:'事業計画・予算（Excel）',category:'社内',what:'月ごとの予算',how:'手入力',freq:'年1回',files:['data/accounting/予算.csv'],agents:['AI社長','AI経理']},
+   {id:'ai_proposals',name:'AI の提案（承認待ち）',category:'社内',what:'各部の AI が出した提案',how:'AI が作成',freq:'毎朝',files:['approvals/pending/'],agents:['AI社長']}],
+  agents:[]};})();
+const D = window.DASH || SAMPLE;
+(function normalize(){
+  const order=['sales_yesterday','sales_mtd','month_budget','gross_margin','cash','customers','atv','ticket','stockouts','approvals'];
+  D.kpis.sort((a,b)=>((order.indexOf(a.id)+99)%99)-((order.indexOf(b.id)+99)%99));
+  D.kpis.forEach(k=>{if(k.alert==null)k.alert=(k.id==='stockouts'||k.id==='approvals')&&k.value>0;});
+  const od={};(D.alerts.overdue||[]).forEach(o=>{const n=o.相手.replace(/（架空）/,'');od[n]=od[n]||{相手:n,金額:0,日数:0,件:0};od[n].金額+=o.金額;od[n].日数=Math.max(od[n].日数,o.日数);od[n].件++});
+  D.alerts.overdue=Object.values(od).sort((a,b)=>b.金額-a.金額);
+  D.alerts.approvals=D.alerts.approvals||[];
+})();
+
+/* 画面を 1920x1080 に合わせる */
+const stage=document.getElementById('stage');
+function fit(){const k=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`scale(${k})`;stage.style.left=((innerWidth-1920*k)/2)+'px';stage.style.top=((innerHeight-1080*k)/2)+'px'}
+addEventListener('resize',fit);fit();
+
+const yen=n=>n==null?'—':Math.round(n).toLocaleString('ja-JP');
+const srcById=Object.fromEntries((D.sources||[]).map(s=>[s.id,s]));
+const wd=iso=>'日月火水木金土'[new Date(iso).getDay()];
+document.getElementById('asof').textContent=`${D.today}（${wd(D.today)}）の朝 ・ 数字は${D.as_of}`;
+
+/* 数字のカウントアップ */
+function countUp(el,to,dec){const t0=performance.now(),dur=900;function f(t){const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3),v=to*e;el.textContent=dec?v.toFixed(dec):yen(v);if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+
+/* 1 ダッシュボード */
+function renderDash(){
+  const box=document.getElementById('kpis');box.innerHTML='';
+  D.kpis.forEach((k,i)=>{const el=document.createElement('div');el.className='kpi rise'+(k.alert?' alert':'')+(i>=4?' mini':'');el.style.setProperty('--d',(i*.05)+'s');
+    const dec=k.unit==='%'?1:0;
+    let dl='';if(k.budget_pct!=null){const up=k.budget_pct>=100;dl=`<div class="d">予算比<i class="${up?'up':''}">${k.budget_pct.toFixed(1)}%</i></div>`}else if(k.delta){if(k.delta.pct!=null){const up=k.delta.pct>=0;dl=`<div class="d">${k.delta.vs}<i class="${up?'up':''}">${up?'＋':'−'}${Math.abs(k.delta.pct).toFixed(1)}%</i></div>`}else if(k.delta.pt!=null){const up=k.delta.pt>=0;dl=`<div class="d">${k.delta.vs}<i class="${up?'up':''}">${up?'＋':'−'}${Math.abs(k.delta.pt).toFixed(1)}pt</i></div>`}else if(k.delta.text){dl=`<div class="d">${k.delta.vs?k.delta.vs+' ':''}<i>${k.delta.text}</i></div>`}}else if(k.id==='stockouts'&&(D.alerts.stockouts||[])[0]){dl=`<div class="d"><i>${D.alerts.stockouts[0].商品.replace(/（.*?）/,'')}</i></div>`}else if(k.id==='approvals'){dl=`<div class="d"><i>${k.value?'社長の決定待ち':'いまは無し'}</i></div>`}
+    el.innerHTML=`<div class="s"><span></span>${(k.sources||[]).length}つの出どころ</div><div class="l">${k.label}</div><div class="v num"><span>0</span><small>${k.unit}</small></div>${dl}`;
+    el.onclick=()=>{show(1);pick(D.kpis.indexOf(k))};box.appendChild(el);countUp(el.querySelector('.v span'),k.value,dec);});
+  // 線グラフ（2段・日曜を抜く）
+  const S0=D.series['売上_日別']||[],B0=D.series['予算_日別']||[],L0=D.series['酒類_日別']||[];
+  const op=a=>a.filter(p=>new Date(p.d).getDay()!==0);
+  const S=op(S0),B=op(B0),L=op(L0);const pos=Object.fromEntries(S.map((p,i)=>[p.d,i]));
+  const W=818,H1=150,H2=90,G=30,n=Math.max(S.length,2),xi=i=>i*(W/(n-1)),x=i=>xi(i);
+  const m1=Math.max(...S.map(p=>p.v),...B.map(p=>p.v))*1.1||1,m2=Math.max(...L.map(p=>p.v))*1.15||1;
+  const y1=v=>H1-v/m1*H1,y2=v=>H1+G+H2-v/m2*H2;
+  const path=(a,y)=>a.filter(p=>pos[p.d]!=null).map((p,i)=>(i?'L':'M')+xi(pos[p.d]).toFixed(1)+','+y(p.v).toFixed(1)).join(' ');
+  let g='';[0,.5,1].forEach(f=>{const v=m1*f;g+=`<line x1="0" x2="${W}" y1="${y1(v)}" y2="${y1(v)}" stroke="var(--line)" stroke-width="1.2"/><text class="ax" x="-10" y="${y1(v)+5}" text-anchor="end">${Math.round(v/10000)}万</text>`});
+  [0,1].forEach(f=>{const v=m2*f;g+=`<line x1="0" x2="${W}" y1="${y2(v)}" y2="${y2(v)}" stroke="var(--line)" stroke-width="1.2"/><text class="ax" x="-10" y="${y2(v)+5}" text-anchor="end">${Math.round(v/10000*10)/10}万</text>`});
+  let so='';const st=(D.alerts.stockouts||[])[0];
+  if(st){const i0=S.findIndex(p=>p.d>=st.since);if(i0>=0)so=`<rect x="${x(i0)-6}" y="-6" width="${W-x(i0)+12}" height="${H1+G+H2+12}" fill="var(--acc-soft)" rx="10"/><text class="ax" x="${W}" y="${H1+G+H2+28}" text-anchor="end" style="fill:var(--acc-ink);font-weight:700">↑ ${st.商品.replace(/（.*?）/,'')} 欠品（${st.since.slice(5).replace('-','/')}〜）</text>`}
+  document.getElementById('chart').innerHTML=so+g+`<path class="ln" d="${path(B,y1)}" stroke="var(--sub)" stroke-opacity=".45" stroke-dasharray="6 6" style="animation:none;stroke-dasharray:6 6;stroke-dashoffset:0"/><path class="ln" d="${path(S,y1)}" stroke="var(--ink)"/><path class="ln" d="${path(L,y2)}" stroke="var(--acc)" style="animation-delay:.6s;stroke-width:5"/>`+
+    `<text class="ax" x="0" y="${H1+G+H2+28}">${((S[0]||{}).d||'').slice(5).replace('-','/')}</text><text class="ax" x="${W/2}" y="${H1+G-8}" text-anchor="middle" style="font-weight:700">酒類</text>`;
+  // 事業別
+  const bl=document.getElementById('bizlist');const bv=b=>b.last7!=null?b.last7:b.value;const bmax=Math.max(...D.by_business.map(bv));
+  bl.innerHTML=D.by_business.map(b=>{const over=b.budget_pct>=100;return `<div class="bz"><span class="n">${b.name}</span><span class="bar"><i class="${over?'hot':''}" data-w="${(bv(b)/bmax*100).toFixed(1)}"></i></span><span class="p num">${yen(bv(b))}<small>予算比 ${b.budget_pct.toFixed(0)}%${b.budget_pct>300?'＊':''}・前週 ${b.wow_pct>=0?'＋':'−'}${Math.abs(b.wow_pct).toFixed(0)}%</small></span></div>`}).join('');
+  setTimeout(()=>bl.querySelectorAll('.bar i').forEach(i=>i.style.width=i.dataset.w+'%'),200);
+  // ネット3店
+  const tot=D.by_channel.reduce((a,c)=>a+c.value,0)||1,shade=['var(--ink)','var(--acc)','var(--sub)'];
+  document.getElementById('stack').innerHTML=D.by_channel.map((c,i)=>`<i style="background:${shade[i%3]}" data-w="${(c.value/tot*100).toFixed(1)}"></i>`).join('');
+  document.getElementById('chanlg').innerHTML=D.by_channel.map((c,i)=>`<span><i style="background:${shade[i%3]}"></i>${c.name} ${Math.round(c.value/tot*100)}%</span>`).join('');
+  setTimeout(()=>document.querySelectorAll('#stack i').forEach(i=>i.style.width=i.dataset.w+'%'),300);
+  // 気づき
+  const a=D.alerts;let h='';(a.stockouts||[]).slice(0,1).forEach(s=>h+=`<div class="al"><span class="tag acc">欠品</span>${s.商品.replace(/（.*?）/,'')}　${s.since.slice(5).replace('-','/')}から・逃した売上 ${yen(s.lost)}円</div>`);
+  (a.overdue||[]).slice(0,1).forEach(o=>h+=`<div class="al"><span class="tag">入金遅れ</span>${o.相手} ${yen(o.金額)}円（${o.件||1}か月分・最長${o.日数}日）</div>`);
+  document.getElementById('alerts').innerHTML=h;
+  // 承認待ち
+  document.getElementById('apprlist').innerHTML=(a.approvals||[]).length===0?'<div class="ap"><div class="w" style="color:var(--sub)">いまは無し</div><div class="m"><span>各部の AI が提案を出すと、ここに並ぶ</span></div></div>':(a.approvals||[]).slice(0,5).map(p=>`<div class="ap${p.urgent?' urgent':''}"><div class="w">${p.何を}</div><div class="m"><span>${p.部}</span><span>${p.金額?yen(p.金額)+'円':'費用なし'}</span><span class="due">${p.期限}</span></div></div>`).join('');
+  document.querySelectorAll('.src').forEach(s=>s.onclick=()=>{show(1);pick(D.kpis.findIndex(k=>k.id===s.dataset.k))});
+}
+
+/* 2 データの流れ */
+let cur=0;
+function renderBar(){document.getElementById('kpibar').innerHTML=D.kpis.map((k,i)=>`<span class="kchip${i===cur?' on':''}" data-i="${i}">${k.label}</span>`).join('');
+  document.querySelectorAll('.kchip').forEach(c=>c.onclick=()=>pick(+c.dataset.i));}
+function pick(i){if(i<0)i=0;cur=(i+D.kpis.length)%D.kpis.length;renderBar();
+  const k=D.kpis[cur],cols=document.getElementById('cols');cols.querySelectorAll('.node').forEach(n=>n.remove());
+  let srcs=(k.sources||[]).map(id=>srcById[id]).filter(Boolean);const files=k.files||[];if(!srcs.length)srcs=[{id:'_ai',name:'各部の AI',how:'AI が作成',what:'提案書を書く',freq:'毎朝',files:files}];
+  const place=(arr,left,top0,gap)=>arr.map((_,j)=>top0+j*gap+(Math.max(0,6-arr.length)*gap/2));
+  const sy=place(srcs,0,60,96),fy=place(files,520,60,96);
+  const mk=(cls,html,l,t,d)=>{const n=document.createElement('div');n.className='node '+cls;n.innerHTML=html;n.style.left=l+'px';n.style.top=t+'px';cols.appendChild(n);setTimeout(()=>n.classList.add('show'),d);return n};
+  const sN=srcs.map((s,j)=>mk('',`${s.name}<span class="how">${s.how}</span><small>${s.what}・${s.freq}</small>`,0,sy[j],80+j*90));
+  const fN=files.map((f,j)=>mk('file',f.replace(/^data\//,'')+`<small>${fileAgents(f)}</small>`,520,fy[j],500+j*90));
+  const dec=k.unit==='%'?1:0;const kN=mk('kpi2',`${k.label}<span class="bigv num">${dec?k.value.toFixed(dec):yen(k.value)}<span style="font-size:24px"> ${k.unit}</span></span><small>${k.how}</small>`,1020,230,1000);
+  requestAnimationFrame(()=>setTimeout(()=>wires(sN,fN,kN,k,srcs),60));
+  document.getElementById('howbox').innerHTML=`計算：<b>${k.how}</b>　／　サービス ${srcs.length} → データ ${files.length} → 数字 1`;
+}
+function fileAgents(f){const set=new Set();(D.sources||[]).forEach(s=>{if((s.files||[]).includes(f))(s.agents||[]).forEach(a=>set.add(a))});return [...set].slice(0,3).join('・')||'AI社長'}
+function wires(sN,fN,kN,k,srcs){const svg=document.getElementById('wires'),ox=svg.getBoundingClientRect(),sc=ox.width/1450;
+  const r=n=>{const b=n.getBoundingClientRect();return {x1:(b.left-ox.left)/sc,x2:(b.right-ox.left)/sc,y:(b.top-ox.top+b.height/2)/sc}};
+  let h='',dots='';const fR=fN.map(r),kR=r(kN);
+  sN.forEach((n,j)=>{const a=r(n);const s=srcs[j];fN.forEach((f,m)=>{if(!s||!(s.files||[]).includes(k.files[m]))return;const b=fR[m];const d=`M${a.x2},${a.y} C${a.x2+90},${a.y} ${b.x1-90},${b.y} ${b.x1},${b.y}`;h+=`<path class="wire hot" d="${d}" style="animation-delay:${.3+j*.08}s"/>`;dots+=`<circle r="6" class="dot"><animateMotion dur="${1.6+((j+m)%3)*.3}s" repeatCount="indefinite" begin="${.8+j*.1}s" path="${d}"/></circle>`})});
+  fR.forEach((b,m)=>{const d=`M${b.x2},${b.y} C${b.x2+90},${b.y} ${kR.x1-90},${kR.y} ${kR.x1},${kR.y}`;h+=`<path class="wire hot" d="${d}" style="animation-delay:${.7+m*.08}s"/>`;dots+=`<circle r="6" class="dot"><animateMotion dur="1.8s" repeatCount="indefinite" begin="${1.2+m*.15}s" path="${d}"/></circle>`});
+  svg.innerHTML=h+dots;}
+
+/* 3 データマップ */
+function renderMap(){const cats={};(D.sources||[]).forEach(s=>(cats[s.category]=cats[s.category]||[]).push(s));
+  const order=['店舗','ネット販売','集客・広告','会計・お金','お客様の声','社内'];const ents=Object.entries(cats).sort((a,b)=>(order.indexOf(a[0])+99)%99-(order.indexOf(b[0])+99)%99);
+  document.getElementById('map').innerHTML=ents.map(([c,arr],i)=>`<div class="grp rise" style="--d:${i*.07}s"><h4><i></i>${c}</h4>${arr.map(s=>`<div class="svc"><span class="nm">${s.name}</span><span class="bd"><span class="${s.how==='API'?'api':''}">${s.how}</span><span>${s.freq}</span></span><span class="wt">${s.what} → ${(s.files||[]).map(f=>f.split('/').filter(Boolean).pop()).join('・')}</span><span class="ag">${(s.agents||[]).map(a=>`<span>${a}</span>`).join('')}</span></div>`).join('')}</div>`).join('');}
+
+/* 切り替え */
+let view=0;
+function show(v){view=v;document.querySelectorAll('.view').forEach((el,i)=>el.classList.toggle('on',i===v));document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',i===v));
+  if(v===0)renderDash();if(v===1)pick(cur);if(v===2)renderMap();}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>show(+t.dataset.v));
+addEventListener('keydown',e=>{if(e.key==='1')show(0);else if(e.key==='2')show(1);else if(e.key==='3')show(2);
+  else if(e.key==='d'||e.key==='D')document.documentElement.classList.toggle('dark');
+  else if(view===1&&(e.key==='ArrowRight'||e.key===' '))pick(cur+1);else if(view===1&&e.key==='ArrowLeft')pick(cur-1);});
+const hv=/#(\d)(?:\.(\d))?/.exec(location.hash);if(hv){cur=+(hv[2]||0);show(+hv[1]-1)}else show(0);
+</script>
+</body>
+</html>

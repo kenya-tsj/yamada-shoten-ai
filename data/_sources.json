@@ -1,0 +1,398 @@
+{
+ "note": "やまだ商店は架空のサンプル企業。どのサービスにも実際にはつないでいない（すべてシミュレーション）。data/ のファイルは tools/sim.py が作り、ここには「本物の会社なら、どのサービスから取り込むか」を書いている。",
+ "today": "2026-11-10",
+ "sources": [
+  {
+   "id": "smaregi",
+   "name": "スマレジ（POS レジ）",
+   "category": "店舗",
+   "what": "店の売上・客数・客単価・品目ごとの売れ数・在庫・発注",
+   "how": "API",
+   "freq": "毎晩",
+   "files": [
+    "data/store/POS_日別.csv",
+    "data/store/POS_商品別_直近14日.csv",
+    "data/purchasing/在庫.csv",
+    "data/purchasing/発注履歴.csv",
+    "data/master/商品.csv"
+   ],
+   "agents": [
+    "AI店長",
+    "AI仕入れ"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "shopify",
+   "name": "自社ネットショップ（Shopify）",
+   "category": "EC",
+   "what": "自社サイトの注文・商品ページ・のしギフト・サイトのお知らせ",
+   "how": "API",
+   "freq": "毎晩",
+   "files": [
+    "data/ec/注文_日別.csv",
+    "data/ec/チャネル別_日別.csv",
+    "data/ec/注文_商品別_直近28日.csv",
+    "data/ec/商品ページ.csv",
+    "data/gift/ギフト受注_日別.csv",
+    "data/pr/お知らせ.md"
+   ],
+   "agents": [
+    "AI EC販売",
+    "AI物流",
+    "AI広報"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "rakuten",
+   "name": "楽天市場（RMS）",
+   "category": "EC",
+   "what": "楽天の店の注文・手数料・ギフトの注文",
+   "how": "CSV書き出し",
+   "freq": "毎朝",
+   "files": [
+    "data/ec/注文_日別.csv",
+    "data/ec/チャネル別_日別.csv",
+    "data/ec/注文_商品別_直近28日.csv",
+    "data/ec/商品ページ.csv",
+    "data/gift/ギフト受注_日別.csv"
+   ],
+   "agents": [
+    "AI EC販売"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "amazon",
+   "name": "Amazon（セラーセントラル）",
+   "category": "EC",
+   "what": "Amazon の注文・手数料・ギフトの注文",
+   "how": "API",
+   "freq": "毎晩",
+   "files": [
+    "data/ec/注文_日別.csv",
+    "data/ec/チャネル別_日別.csv",
+    "data/ec/注文_商品別_直近28日.csv",
+    "data/ec/商品ページ.csv",
+    "data/gift/ギフト受注_日別.csv"
+   ],
+   "agents": [
+    "AI EC販売"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "ga4",
+   "name": "Google アナリティクス 4",
+   "category": "Web",
+   "what": "ネットショップの訪問（セッション）・流入元・購入率",
+   "how": "API",
+   "freq": "毎朝",
+   "files": [
+    "data/ec/注文_日別.csv",
+    "data/ec/商品ページ.csv"
+   ],
+   "agents": [
+    "AI EC販売",
+    "AI広告"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "google_ads",
+   "name": "Google 広告",
+   "category": "広告",
+   "what": "検索広告の費用・表示・クリック・反応からの売上",
+   "how": "API",
+   "freq": "毎朝",
+   "files": [
+    "data/marketing/広告.csv"
+   ],
+   "agents": [
+    "AI広告"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "meta_ads",
+   "name": "Meta 広告（Instagram 広告）",
+   "category": "広告",
+   "what": "Instagram 広告の費用・表示・クリック・反応からの売上",
+   "how": "API",
+   "freq": "毎朝",
+   "files": [
+    "data/marketing/広告.csv"
+   ],
+   "agents": [
+    "AI広告"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "flyer_invoice",
+   "name": "新聞折込チラシ（印刷会社の請求書）",
+   "category": "広告",
+   "what": "チラシの費用・配った部数・クーポンの回収",
+   "how": "手入力",
+   "freq": "月次",
+   "files": [
+    "data/marketing/広告.csv"
+   ],
+   "agents": [
+    "AI広告",
+    "AI経理"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "freee_accounting",
+   "name": "freee 会計",
+   "category": "会計",
+   "what": "仕訳・毎日の帳簿・月次の損益・売掛金・買掛金・取引先",
+   "how": "API",
+   "freq": "毎晩",
+   "files": [
+    "data/accounting/日計表.csv",
+    "data/accounting/月次PL.csv",
+    "data/accounting/売掛金.csv",
+    "data/accounting/買掛金.csv",
+    "data/master/仕入先.csv",
+    "data/master/法人顧客.csv"
+   ],
+   "agents": [
+    "AI経理",
+    "AI社長"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "freee_invoice",
+   "name": "freee 請求書",
+   "category": "会計",
+   "what": "法人への納品と請求書",
+   "how": "API",
+   "freq": "毎晩",
+   "files": [
+    "data/b2b/納品_日別.csv",
+    "data/b2b/法人売上_月別.csv",
+    "data/accounting/売掛金.csv"
+   ],
+   "agents": [
+    "AI営業",
+    "AI経理"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "mf_expense",
+   "name": "マネーフォワード クラウド経費",
+   "category": "会計",
+   "what": "経費の精算（ガソリン・消耗品・立て替え）",
+   "how": "CSV書き出し",
+   "freq": "毎週",
+   "files": [
+    "data/accounting/月次PL.csv"
+   ],
+   "agents": [
+    "AI経理"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "netbank",
+   "name": "ネットバンキング（△△銀行・架空）",
+   "category": "会計",
+   "what": "口座の入金・出金・残高",
+   "how": "CSV書き出し",
+   "freq": "毎朝",
+   "files": [
+    "data/accounting/日計表.csv",
+    "data/accounting/資金繰り.csv",
+    "data/accounting/売掛金.csv"
+   ],
+   "agents": [
+    "AI経理"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "gbp",
+   "name": "Google ビジネスプロフィール",
+   "category": "口コミ・SNS",
+   "what": "地図の口コミ・電話と道順のタップ",
+   "how": "API",
+   "freq": "毎朝",
+   "files": [
+    "data/marketing/口コミ.csv",
+    "data/marketing/広告.csv"
+   ],
+   "agents": [
+    "AI接客",
+    "AI広報"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "instagram",
+   "name": "Instagram（Meta ビジネススイート）",
+   "category": "口コミ・SNS",
+   "what": "投稿・リーチ・フォロワー・お知らせの投稿",
+   "how": "API",
+   "freq": "毎週",
+   "files": [
+    "data/marketing/SNS.csv",
+    "data/pr/お知らせ.md"
+   ],
+   "agents": [
+    "AI広報",
+    "AI広告"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "line_oa",
+   "name": "LINE 公式アカウント",
+   "category": "口コミ・SNS",
+   "what": "友だちの数・配信・開封・クーポンの利用",
+   "how": "CSV書き出し",
+   "freq": "毎週",
+   "files": [
+    "data/marketing/LINE.csv"
+   ],
+   "agents": [
+    "AI広報"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "delivery_sheet",
+   "name": "配達・電話注文台帳（Google スプレッドシート）",
+   "category": "社内",
+   "what": "電話の着信・取れなかった電話・配達の件数・地区・便・時間",
+   "how": "手入力",
+   "freq": "毎晩",
+   "files": [
+    "data/delivery/配達_日別.csv"
+   ],
+   "agents": [
+    "AI受付",
+    "AI物流"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "gift_sheet",
+   "name": "ギフト受注台帳（Google スプレッドシート）",
+   "category": "社内",
+   "what": "店頭・電話・法人のお歳暮・お中元の承り",
+   "how": "手入力",
+   "freq": "毎晩",
+   "files": [
+    "data/gift/ギフト受注_日別.csv",
+    "data/gift/ギフト受注_週別.csv"
+   ],
+   "agents": [
+    "AI EC販売"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "staff_sheet",
+   "name": "名簿とシフト表（Google スプレッドシート）",
+   "category": "社内",
+   "what": "人の役割・勤務の時間",
+   "how": "手入力",
+   "freq": "月次",
+   "files": [
+    "data/master/従業員.csv"
+   ],
+   "agents": [
+    "AI店長",
+    "AI社長"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "contracts_pdf",
+   "name": "契約書（PDF）",
+   "category": "社内",
+   "what": "契約の相手・期間・更新日・申し出期限・条項",
+   "how": "PDF読み取り",
+   "freq": "月次",
+   "files": [
+    "data/legal/契約.csv"
+   ],
+   "agents": [
+    "AI法務",
+    "AI営業"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "licenses_pdf",
+   "name": "許認可（PDF）",
+   "category": "社内",
+   "what": "酒類の免許・営業許可・研修の期限",
+   "how": "PDF読み取り",
+   "freq": "月次",
+   "files": [
+    "data/legal/許認可.csv"
+   ],
+   "agents": [
+    "AI法務"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "kessansho_pdf",
+   "name": "前期の決算書（PDF）",
+   "category": "社内",
+   "what": "去年の月ごとの売上と損益（前年比のもと）",
+   "how": "PDF読み取り",
+   "freq": "月次",
+   "files": [
+    "data/accounting/月次PL.csv",
+    "data/gift/ギフト受注_週別.csv"
+   ],
+   "agents": [
+    "AI経理",
+    "AI社長"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "budget_excel",
+   "name": "事業計画・予算（Excel）",
+   "category": "社内",
+   "what": "今年度の月ごと・事業ごとの予算",
+   "how": "CSV書き出し",
+   "freq": "月次",
+   "files": [
+    "data/accounting/予算.csv"
+   ],
+   "agents": [
+    "AI経理",
+    "AI社長"
+   ],
+   "simulated": true
+  },
+  {
+   "id": "owner_memo",
+   "name": "地域の予定（店主のメモ）",
+   "category": "社内",
+   "what": "町の行事・屋台・天気の見通し",
+   "how": "手入力",
+   "freq": "毎週",
+   "files": [
+    "data/pr/地域の予定.md"
+   ],
+   "agents": [
+    "AI広報",
+    "AI仕入れ",
+    "AI受付"
+   ],
+   "simulated": true
+  }
+ ]
+}

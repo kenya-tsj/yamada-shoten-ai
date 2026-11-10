@@ -1,0 +1,5 @@
+.DS_Store
+__pycache__/
+reports/dashboard.html
+reports/dashboard_data.json
+logs/朝会_自動.log
